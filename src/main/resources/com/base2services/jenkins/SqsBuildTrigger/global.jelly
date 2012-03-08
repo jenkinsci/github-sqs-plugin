@@ -1,0 +1,23 @@
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+    <f:section title="${%Amazon SQS Profiles}">
+        <f:nested>
+            <table style="width:100%">
+                <f:section title="${%Amazon SQS Details}">
+                    <f:block>
+                        <f:repeatable field="sqsProfiles" minimum="${1}" noAddButton="true">
+                            <table style="width:100%">
+                                <st:include from="${descriptor}" page="${descriptor.configPage}" />
+                                <f:entry>
+                                    <div align="right">
+                                        <input type="button" value="${%Add}" class="repeatable-add show-if-last" />
+                                        <f:repeatableDeleteButton />
+                                    </div>
+                                </f:entry>
+                            </table>
+                        </f:repeatable>
+                    </f:block>
+                </f:section>
+            </table>
+        </f:nested>
+    </f:section>
+</j:jelly>
