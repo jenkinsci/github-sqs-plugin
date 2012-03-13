@@ -5,6 +5,8 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import com.amazonaws.services.sqs.model.ListQueuesResult;
+import com.base2services.jenkins.github.GitHubTriggerProcessor;
+import com.base2services.jenkins.trigger.TriggerProcessor;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -57,7 +59,7 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     }
 
     public String getQueueUrl() {
-        return createQueue(getSQSClient(),sqsQueue);
+        return createQueue(getSQSClient(), sqsQueue);
     }
 
     /**
@@ -76,6 +78,10 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
         return sqs.createQueue(new CreateQueueRequest(queue)).getQueueUrl();
     }
 
+    //TODO: refactor this so that it's part of the selection process when enabling a this trigger on a job/project
+    public TriggerProcessor getTriggerProcessor() {
+        return new GitHubTriggerProcessor();
+    }
 
     @Extension
     public static class DescriptorImpl extends Descriptor<SqsProfile> {
@@ -87,10 +93,10 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
         public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue) throws IOException {
             boolean valid = false;
             try {
-                AmazonSQS sqs = new AmazonSQSClient(new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue));
-                ListQueuesResult result = sqs.listQueues();
-                if(result != null) {
-                    return FormValidation.ok("Verified");
+                SqsProfile profile = new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue);
+                String queue = profile.getQueueUrl();
+                if(queue != null) {
+                    return FormValidation.ok("Verified SQS Queue " + queue);
                 } else {
                     return FormValidation.error("Failed to validate the account");
                 }

@@ -5,7 +5,9 @@ import com.cloudbees.jenkins.GitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubTrigger;
 import hudson.Extension;
 import hudson.Util;
+import hudson.console.AnnotatedLargeText;
 import hudson.model.AbstractProject;
+import hudson.model.Action;
 import hudson.model.Hudson;
 import hudson.model.Item;
 import hudson.plugins.git.GitSCM;
@@ -15,6 +17,7 @@ import hudson.triggers.TriggerDescriptor;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.StreamTaskListener;
 import net.sf.json.JSONObject;
+import org.apache.commons.jelly.XMLOutput;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.jenkinsci.plugins.multiplescms.MultiSCM;
@@ -24,8 +27,11 @@ import org.kohsuke.stapler.StaplerRequest;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.text.DateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -136,8 +142,35 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     }
 
     @Override
-    public void stop() {
-        super.stop();
+    public Collection<? extends Action> getProjectActions() {
+        return Collections.singleton(new SqsBuildTriggerPollingAction());
+    }
+
+    public final class SqsBuildTriggerPollingAction implements Action {
+
+        public AbstractProject<?,?> getOwner() {
+            return job;
+        }
+
+        public String getIconFileName() {
+            return "clipboard.png";
+        }
+
+        public String getDisplayName() {
+            return "SQS Activity Log";
+        }
+
+        public String getUrlName() {
+            return "SQSActivityLog";
+        }
+        
+        public String getLog() throws IOException {
+            return Util.loadFile(getLogFile());
+        }
+
+        public void writeLogTo(XMLOutput out) throws IOException {
+            new AnnotatedLargeText<SqsBuildTriggerPollingAction>(getLogFile(), Charset.defaultCharset(),true,this).writeHtmlTo(0,out.asWriter());
+        }
     }
 
     @Extension
