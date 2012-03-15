@@ -5,7 +5,7 @@
   <f:entry title="${%Access Key}" field="awsAccessKeyId">
     <f:textbox/>
   </f:entry>
-  <f:entry title="${%SSecret Key}" field="awsSecretAccessKey">
+  <f:entry title="${%Secret Key}" field="awsSecretAccessKey">
     <f:password/>
   </f:entry>
   <f:validateButton title="${%Test Access}" with="awsAccessKeyId,awsSecretAccessKey,sqsQueue" method="validate"/>
