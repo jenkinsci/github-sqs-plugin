@@ -41,6 +41,7 @@ public class SqsQueueHandler extends PeriodicWork {
             for(Message message : messages) {
                 //Process the message payload, it needs to conform to the GitHub Web-Hook JSON format
                 try {
+                    logger.fine("got payload\n" + message.getBody());
                     processor.trigger(message.getBody());
                 } finally {
                     //delete the message even if it failed

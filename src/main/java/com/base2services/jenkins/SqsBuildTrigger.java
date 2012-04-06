@@ -21,6 +21,8 @@ import org.apache.commons.jelly.XMLOutput;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.jenkinsci.plugins.multiplescms.MultiSCM;
+import org.kohsuke.github.GHException;
+import org.kohsuke.github.GHRepository;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
@@ -33,8 +35,10 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -137,13 +141,61 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     public void start(AbstractProject project, boolean newInstance) {
         super.start(project, newInstance);
         if(newInstance && getDescriptor().isManageHook()) {
-            //TODO: register sqs github web hook
+            // make sure we have hooks installed. do this lazily to avoid blocking the UI thread.
+            final Set<GitHubRepositoryName> names = getGitHubRepositories();
+
+            getDescriptor().queue.execute(new Runnable() {
+                public void run() {
+                    OUTER:
+                    for (GitHubRepositoryName name : names) {
+                        for (GHRepository repo : name.resolve()) {
+                            try {
+                                //Currently creates the sqs hook based on the details of the
+                                //first sqs profile. Need to find a clean way to map the profile
+                                //to the github repo so we know how to populate the hook
+                                if (createJenkinsHook(repo,getDescriptor().getSqsProfiles().get(0))) {
+                                    LOGGER.info("Added GitHub SQS webhook for "+name);
+                                    continue OUTER;
+                                }
+                            } catch (Throwable e) {
+                                LOGGER.log(Level.WARNING, "Failed to add GitHub webhook for "+name, e);
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    @Override
+    public void stop() {
+        if (getDescriptor().isManageHook()) {
+            SqsHookCleaner cleaner = SqsHookCleaner.get();
+            if (cleaner != null) {
+                cleaner.onStop(this);
+            }
         }
     }
 
     @Override
     public Collection<? extends Action> getProjectActions() {
         return Collections.singleton(new SqsBuildTriggerPollingAction());
+    }
+
+    private boolean createJenkinsHook(GHRepository repo, SqsProfile profile) {
+        if(profile == null) {
+            return false;
+        }
+        try {
+            Map<String,String> config = new HashMap<String, String>();
+            config.put("aws_access_key",profile.getAWSAccessKeyId());
+            config.put("aws_secret_key",profile.getAWSSecretKey());
+            config.put("sqs_queue_name",profile.getSqsQueue());
+            repo.createHook("sqsqueue", config, null, true);
+            return true;
+        } catch (IOException e) {
+            throw new GHException("Failed to update Github SQS hooks", e);
+        }
     }
 
     public final class SqsBuildTriggerPollingAction implements Action {
@@ -179,6 +231,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
 
         private boolean manageHook = true;
         private volatile List<SqsProfile> sqsProfiles = new ArrayList<SqsProfile>();
+        private volatile List<Credential> credentials = new ArrayList<Credential>();
 
         public DescriptorImpl() {
             load();
@@ -201,8 +254,10 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
         @Override
         public boolean configure(StaplerRequest req, JSONObject json) throws FormException {
             JSONObject sqs = json.getJSONObject("sqsProfiles");
-            //sqsEnabled = "enabled".equals(sqs.getString("value"));
+            JSONObject hookMode = json.getJSONObject("sqsHookMode");
+            manageHook = "auto".equals(hookMode.getString("value"));
             sqsProfiles = req.bindJSONToList(SqsProfile.class,sqs);
+            credentials = req.bindJSONToList(Credential.class,hookMode.get("credentials"));
             save();
             return true;
         }
@@ -215,6 +270,9 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
             return sqsProfiles;
         }
 
+        public List<Credential> getCredentials() {
+            return credentials;
+        }
 
     }
 }
