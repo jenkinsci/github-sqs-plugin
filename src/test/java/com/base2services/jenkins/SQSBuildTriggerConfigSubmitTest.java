@@ -15,11 +15,7 @@ import java.util.List;
  */
 public class SQSBuildTriggerConfigSubmitTest extends HudsonTestCase {
 
-    public void testIgnore() {
-
-    }
-
-    public void ignoretestConfigSubmit_SingleProfile() throws Exception {
+    public void testConfigSubmit_SingleProfile() throws Exception {
         //Given
         WebClient client = configureWebClient();
         HtmlPage p = client.goTo("configure");
@@ -27,6 +23,9 @@ public class SQSBuildTriggerConfigSubmitTest extends HudsonTestCase {
         f.getInputByName("_.sqsQueue").setValueAttribute("testQueue");
         f.getInputByName("_.awsAccessKeyId").setValueAttribute("myaccesskey");
         f.getInputByName("_.awsSecretAccessKey").setValueAttribute("myverysecretkey");
+        f.getInputsByValue("auto").get(0).setChecked(true);
+        f.getInputByName("_.username").setValueAttribute("jenkins");
+        f.getInputByName("_.password").setValueAttribute("password");
 
         //When
         submit(f);
