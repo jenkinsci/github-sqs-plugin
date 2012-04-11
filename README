@@ -1,3 +1,18 @@
+
+Jenkins GitHub SQS Plugin
+=========================
+
+Read more: http://wiki.jenkins-ci.org/display/JENKINS/GitHub+SQS+Plugin
+
+Development
+===========
+
+Start the local Jenkins instance:
+
+    mvn hpi:run
+
+License
+-------
 (The MIT License)
 
 Copyright (c) 2012 Aaron Wakler
@@ -22,15 +37,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ==============
-
-This plugin triggers builds on events from the GitHub that are
-published via Amazon Web Services Simple Queue Service.
-
-=============
-
-Notes:
-Currently needs a modified version of the github-plugin to work you'll currently need to pull and build from my fork and build it
-https://github.com/aaronwalker/github-plugin
 
 Maintainers
 
