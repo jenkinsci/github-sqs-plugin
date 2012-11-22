@@ -1,5 +1,6 @@
 package com.base2services.jenkins;
 
+import com.base2services.jenkins.github.SQSGitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubPushCause;
 import com.cloudbees.jenkins.GitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubTrigger;
@@ -128,7 +129,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
             for (RemoteConfig rc : git.getRepositories()) {
                 for (URIish uri : rc.getURIs()) {
                     String url = uri.toString();
-                    GitHubRepositoryName repo = GitHubRepositoryName.create(url);
+                    GitHubRepositoryName repo = SQSGitHubRepositoryName.create(url);
                     if (repo != null) {
                         r.add(repo);
                     }
