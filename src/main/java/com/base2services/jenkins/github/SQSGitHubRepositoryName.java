@@ -1,7 +1,6 @@
 package com.base2services.jenkins.github;
 
 import com.cloudbees.jenkins.GitHubRepositoryName;
-import com.cloudbees.jenkins.GitHubWebHook;
 import hudson.util.AdaptedIterator;
 import hudson.util.Iterators;
 import org.kohsuke.github.GHRepository;
@@ -71,6 +70,16 @@ public class SQSGitHubRepositoryName extends GitHubRepositoryName {
                 });
             }
         };
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || !(o instanceof GitHubRepositoryName)) return false;
+
+        GitHubRepositoryName that = (GitHubRepositoryName) o;
+
+        return repositoryName.equals(that.repositoryName) && userName.equals(that.userName) && host.equals(that.host);
     }
 
     private <V> Iterator<V> filterNull(Iterator<V> itr) {
