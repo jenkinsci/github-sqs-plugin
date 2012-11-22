@@ -11,7 +11,7 @@
 
     <groupId>com.base2services.jenkins</groupId>
     <artifactId>github-sqs-plugin</artifactId>
-    <version>1.2-SNAPSHOT</version>
+    <version>1.2</version>
     <packaging>hpi</packaging>
     <name>GitHub SQS Build Trigger Plugin</name>
     <url>http://wiki.jenkins-ci.org/display/JENKINS/GitHub+SQS+Plugin</url>
