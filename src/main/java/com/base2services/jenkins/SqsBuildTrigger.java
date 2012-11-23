@@ -61,6 +61,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     /**
      * Called when a POST is made.
      */
+    @Override
     public void onPost() {
         getDescriptor().queue.execute(this);
     }
@@ -105,6 +106,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
      * Does this project read from a repository of the given user name and the
      * given repository name?
      */
+    @Override
     public Set<GitHubRepositoryName> getGitHubRepositories() {
         Set<GitHubRepositoryName> r = new HashSet<GitHubRepositoryName>();
         if (Hudson.getInstance().getPlugin("multiple-scms") != null
