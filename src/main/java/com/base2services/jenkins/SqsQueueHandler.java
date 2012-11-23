@@ -5,7 +5,6 @@ import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.base2services.jenkins.trigger.TriggerProcessor;
-import com.cloudbees.jenkins.GitHubWebHook;
 import hudson.Extension;
 import hudson.model.PeriodicWork;
 import hudson.util.SequentialExecutionQueue;
@@ -13,6 +12,7 @@ import hudson.util.TimeUnit2;
 
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -70,6 +70,9 @@ public class SqsQueueHandler extends PeriodicWork {
                 try {
                     logger.fine("got payload\n" + message.getBody());
                     processor.trigger(message.getBody());
+
+                } catch (Exception ex) {
+                    logger.log(Level.SEVERE,"unable to trigger builds " + ex.getMessage(),ex);
                 } finally {
                     //delete the message even if it failed
                     sqs.deleteMessage(new DeleteMessageRequest()

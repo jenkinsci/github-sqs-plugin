@@ -31,14 +31,18 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
     }
 
     public void processGitHubPayload(String payload, Class<? extends Trigger> triggerClass) {
-        JSONObject o = JSONObject.fromObject(payload);
-        JSONObject repository = o.getJSONObject("repository");
+        JSONObject json = extractJsonFromPayload(payload);
+        if(json == null) {
+            LOGGER.warning("sqs message contains unknown payload format");
+            return;
+        }
+        JSONObject repository = json.getJSONObject("repository");
         String repoUrl = repository.getString("url"); // something like 'https://github.com/kohsuke/foo'
         String repoName = repository.getString("name"); // 'foo' portion of the above URL
         String ownerName = repository.getJSONObject("owner").getString("name"); // 'kohsuke' portion of the above URL
 
-        LOGGER.info("Received Message for "+repoUrl);
-        LOGGER.fine("Full details of the POST was "+o.toString());
+        LOGGER.info("Received Message for " + repoUrl);
+        LOGGER.fine("Full details of the POST was " + json.toString());
         Matcher matcher = REPOSITORY_NAME_PATTERN.matcher(repoUrl);
         if (matcher.matches()) {
             // run in high privilege to see all the projects anonymous users don't see.
@@ -65,5 +69,21 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
         } else {
             LOGGER.warning("Malformed repo url "+repoUrl);
         }
+    }
+
+    private JSONObject extractJsonFromPayload(String payload) {
+        JSONObject repository = null;
+        JSONObject json = JSONObject.fromObject(payload);
+        if(json.has("Type")) {
+            String msg = json.getString("Message");
+            if(msg != null) {
+                msg = msg.substring(1,msg.length()-1); //remove the leading and trailing double quotes
+                return JSONObject.fromObject(msg);
+            }
+        } else if (json.has("repository")){
+            return json;
+
+        }
+        return null;
     }
 }
