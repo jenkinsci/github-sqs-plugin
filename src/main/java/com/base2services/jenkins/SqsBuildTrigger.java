@@ -66,6 +66,10 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
         getDescriptor().queue.execute(this);
     }
 
+    public void onPost(String username) {
+        onPost();
+    }
+
     /**
      * Returns the file that records the last/current polling activity.
      */
