@@ -16,6 +16,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.IOException;
+import java.util.regex.Pattern;
 
 /**
  * SqsProfile to access SQS
@@ -28,6 +29,8 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public final Secret awsSecretAccessKey;
     public final String sqsQueue;
 
+    static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
+    private final boolean urlSpecified;
     private AmazonSQS client;
 
 
@@ -36,6 +39,7 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
         this.awsAccessKeyId = awsAccessKeyId;
         this.awsSecretAccessKey = awsSecretAccessKey;
         this.sqsQueue = sqsQueue;
+        this.urlSpecified = Pattern.matches(queueUrlRegex, sqsQueue);
         this.client = null;
     }
 
@@ -59,7 +63,8 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     }
 
     public String getQueueUrl() {
-        return createQueue(getSQSClient(), sqsQueue);
+        return urlSpecified ? sqsQueue
+                            : createQueue(getSQSClient(), sqsQueue);
     }
 
     /**
