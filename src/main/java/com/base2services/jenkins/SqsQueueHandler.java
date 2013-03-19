@@ -36,9 +36,11 @@ public class SqsQueueHandler extends PeriodicWork {
     protected void doRun() throws Exception {
         if(queue.getInProgress().size() == 0) {
             List<SqsProfile> profiles = SqsBuildTrigger.DescriptorImpl.get().getSqsProfiles();
-            queue.setExecutors(Executors.newFixedThreadPool(profiles.size()));
-            for(final SqsProfile profile : profiles) {
-                queue.execute(new SQSQueueReceiver(profile));
+            if (profiles.size() != 0) {
+                queue.setExecutors(Executors.newFixedThreadPool(profiles.size()));
+                for (final SqsProfile profile : profiles) {
+                    queue.execute(new SQSQueueReceiver(profile));
+                }
             }
         } else {
             logger.fine("Currently Waiting for Messages from Queues");
