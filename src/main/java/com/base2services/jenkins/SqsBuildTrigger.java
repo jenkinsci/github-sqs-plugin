@@ -7,10 +7,7 @@ import com.cloudbees.jenkins.GitHubTrigger;
 import hudson.Extension;
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
-import hudson.model.AbstractProject;
-import hudson.model.Action;
-import hudson.model.Hudson;
-import hudson.model.Item;
+import hudson.model.*;
 import hudson.plugins.git.GitSCM;
 import hudson.scm.SCM;
 import hudson.triggers.Trigger;
@@ -89,7 +86,17 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
                 logger.println("Done. Took "+ Util.getTimeSpanString(System.currentTimeMillis() - start));
                 if(result) {
                     logger.println("Changes found");
-                    job.scheduleBuild(new GitHubPushCause());
+                    // Fix for JENKINS-16617, JENKINS-16669
+                    // The Cause instance needs to have a unique identity (when equals() is called), otherwise
+                    // scheduleBuild() returns false - indicating that this job is already in the queue or
+                    // has already been processed.
+                    if (job.scheduleBuild(new Cause.RemoteCause("GitHub via SQS", "SQS poll initiated on " +
+                            DateFormat.getDateTimeInstance().format(new Date(start))))) {
+                      logger.println("Job queued");
+                    }
+                    else {
+                      logger.println("Job NOT queued - it was determined that this job has been queued already.");
+                    }
                 } else {
                     logger.println("No changes");
                 }
