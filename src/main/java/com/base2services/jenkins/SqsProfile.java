@@ -17,6 +17,7 @@ import org.kohsuke.stapler.QueryParameter;
 
 import java.io.IOException;
 import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 /**
  * SqsProfile to access SQS
@@ -30,6 +31,7 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public final String sqsQueue;
 
     static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
+    static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
     private final boolean urlSpecified;
     private AmazonSQS client;
 
@@ -54,6 +56,13 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public AmazonSQS getSQSClient() {
         if(client == null) {
             client =  new AmazonSQSClient(this);
+            if(urlSpecified) {
+                Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
+                if(endpointMatcher.find()) {
+                    String endpoint = endpointMatcher.group(1);
+                    client.setEndpoint(endpoint);
+                }
+            }
         }
         return client;
     }
