@@ -127,7 +127,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
             for (SCM scm : scmList) {
                 addRepositories(r, scm);
             }
-        } else {
+        } else if (job != null) {
             addRepositories(r, job.getScm());
         }
         return r;
