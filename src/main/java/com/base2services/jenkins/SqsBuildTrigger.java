@@ -120,7 +120,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     @Override
     public Set<GitHubRepositoryName> getGitHubRepositories() {
         Set<GitHubRepositoryName> r = new HashSet<GitHubRepositoryName>();
-        if (Hudson.getInstance().getPlugin("multiple-scms") != null
+        if (Hudson.getInstance().getPlugin("multiple-scms") != null && job != null
                 && job.getScm() instanceof MultiSCM) {
             MultiSCM multiSCM = (MultiSCM) job.getScm();
             List<SCM> scmList = multiSCM.getConfiguredSCMs();
