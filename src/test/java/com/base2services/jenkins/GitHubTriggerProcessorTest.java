@@ -75,4 +75,12 @@ public class GitHubTriggerProcessorTest {
         gtp.processGitHubPayload(payload, sbt.getClass());
         verify(sbt, never()).onPost();
     }
+
+    @Test
+    public void shouldTriggerUnquotedSnsMsg() throws Exception {
+        payload = "{\"Type\" : \"Notification\", \"Message\" : \"{'repository': {'owner': {'name': 'foo'}, 'url': 'https://github.com/foo/bar', 'name': 'bar'}}\", }";
+        GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
+        gtp.processGitHubPayload(payload, sbt.getClass());
+        verify(sbt).onPost();
+    }
 }
