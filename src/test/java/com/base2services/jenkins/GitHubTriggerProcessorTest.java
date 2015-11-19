@@ -72,7 +72,7 @@ public class GitHubTriggerProcessorTest {
     public void shouldNotTriggerWithBadPayload() throws Exception {
         payload = "{'noRepoInfo': {'empty': 'https://github.com/foo/bar'}}".replace("'", "\"");
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.trigger(payload);
         verify(sbt, never()).onPost();
     }
 
