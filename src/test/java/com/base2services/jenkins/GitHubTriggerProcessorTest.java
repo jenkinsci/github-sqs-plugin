@@ -45,42 +45,49 @@ public class GitHubTriggerProcessorTest {
     }
 
     @Test
-    public void shouldTriggerWhenRepoInPayload() throws Exception {
+    public void defaultMsgModeShouldTriggerWhenRepoInPayload() throws Exception {
         payload = "{'repository': {'url': 'https://github.com/foo/bar', 'owner': {'name': 'foo'}, 'name': 'bar'}}".replace("'", "\"");
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.processGitHubPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
         verify(sbt).onPost();
     }
 
     @Test
-    public void shouldNotTriggerWithWrongRepo() throws Exception {
+    public void defaultMsgModeShouldNotTriggerWithWrongRepo() throws Exception {
         payload = "{'repository': {'url': 'https://github.com/foo/baz', 'owner': {'name': 'foo'}, 'name': 'baz'}}".replace("'", "\"");
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.processGitHubPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
         verify(sbt, never()).onPost();
     }
 
     @Test
-    public void shouldNotTriggerWithAFork() throws Exception {
+    public void defaultMsgModeShouldNotTriggerWithAFork() throws Exception {
         payload = "{'repository': {'url': 'https://github.com/fob/bar', 'owner': {'name': 'fob'}, 'name': 'bar'}}".replace("'", "\"");
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.processGitHubPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
         verify(sbt, never()).onPost();
     }
 
     @Test
-    public void shouldNotTriggerWithBadPayload() throws Exception {
+    public void defaultMsgModeShouldNotTriggerWithBadPayload() throws Exception {
         payload = "{'noRepoInfo': {'empty': 'https://github.com/foo/bar'}}".replace("'", "\"");
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.processGitHubPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
         verify(sbt, never()).onPost();
     }
 
     @Test
-    public void shouldTriggerUnquotedSnsMsg() throws Exception {
+    public void defaultMsgModeShouldTriggerUnquotedSnsMsg() throws Exception {
         payload = "{\"Type\" : \"Notification\", \"Message\" : \"{'repository': {'owner': {'name': 'foo'}, 'url': 'https://github.com/foo/bar', 'name': 'bar'}}\", }";
         GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
-        gtp.processGitHubPayload(payload, sbt.getClass());
+        gtp.processGitHubPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
         verify(sbt).onPost();
+    }
+
+    @Test
+    public void customMsgModeShouldTriggerWithWrongRepo() throws Exception {
+        payload = "{'job': 'testProject'}".replace("'", "\"");
+        GitHubTriggerProcessor gtp = new GitHubTriggerProcessor();
+        gtp.processCustomPayload(gtp.extractJsonFromPayload(payload), sbt.getClass());
     }
 }

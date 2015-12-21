@@ -10,6 +10,7 @@ import hudson.model.PeriodicWork;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.TimeUnit2;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -43,7 +44,7 @@ public class SqsQueueHandler extends PeriodicWork {
                 }
             }
         } else {
-            logger.fine("Currently Waiting for Messages from Queues");
+            LOGGER.fine("Currently Waiting for Messages from Queues");
         }
     }
 
@@ -66,15 +67,23 @@ public class SqsQueueHandler extends PeriodicWork {
             TriggerProcessor processor = profile.getTriggerProcessor();
             ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl);
             receiveMessageRequest.setWaitTimeSeconds(20);
-            List<Message> messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
+            List<Message> messages = new ArrayList<Message>();
+            // Try to pick up the messages from SQS, and log if an error was encountered,
+            // for example a 403 Access to the resource is denied.
+            try {
+                messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
+
+            } catch (Exception ex) {
+                LOGGER.warning("Unable to retrieve messages from the queue. " + ex.getMessage());
+            }
             for(Message message : messages) {
-                //Process the message payload, it needs to conform to the GitHub Web-Hook JSON format
+                //Process the message payload
                 try {
-                    logger.fine("got payload\n" + message.getBody());
+                    LOGGER.fine("got payload\n" + message.getBody());
                     processor.trigger(message.getBody());
 
                 } catch (Exception ex) {
-                    logger.log(Level.SEVERE,"unable to trigger builds " + ex.getMessage(),ex);
+                    LOGGER.log(Level.SEVERE,"unable to trigger builds " + ex.getMessage(),ex);
                 } finally {
                     //delete the message even if it failed
                     sqs.deleteMessage(new DeleteMessageRequest()
