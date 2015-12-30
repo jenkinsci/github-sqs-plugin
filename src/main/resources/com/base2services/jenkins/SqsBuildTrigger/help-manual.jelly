@@ -1,9 +1,36 @@
 <j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
     <l:ajax>
         <div>
-            Don't let Jenkins talk to GitHub and manage the SQS Queue hook, and opt to do it manually.
-            In this mode, in addition to configure projects with "Build when a message is published to an SQS Queue",
-            you need to manually add the GitHub SQS Hook
+            Don't let Jenkins talk to GitHub and manage the SQS Queue hook; instead opt to do it manually.
+            <p>There are two cases in which you would want to do this:</p>
+            <ol>
+                <li>You want to control the GitHub hook yourself.</li>
+                <li>You are sending a custom JSON payload.</li>
+            </ol>
+            <p>In both these cases, in addition to either manually adding the GitHub SQS Hook in the GitHub settings of
+                your repo (default message payload) or setting up your own application that will publish messages (custom payload),
+                you also need to configure your project(s) to "Build when a message is published to an SQS Queue."</p>
+            <p>Custom payload technical details:</p>
+            <ul>
+            <li>Signal to the plugin that you are using a custom payload by including a root object named
+                "custom_format" of any type and value.</li>
+            <li>As noted above, custom payloads will only trigger jobs that are configured to use the SQS trigger.</li>
+            <li>The custom payload must contain a root object named "job" of type string which contains the name of the job to trigger.</li>
+            <li>The custom payload may contain a root object named "parameters" that contains a list of parameters to
+                pass to the job when scheduled. Each parameter object should contain information about its type, name, and value.</li>
+            <li>Valid parameter types are "string" and "boolean". These will get cast as
+                <a href="http://javadoc.jenkins-ci.org/hudson/model/StringParameterValue.html">StringParameterValue</a> and
+                <a href="http://javadoc.jenkins-ci.org/hudson/model/BooleanParameterValue.html">BooleanParameterValue</a>, respectively.
+            </li>
+            <li>You must pass all parameter values that you want to use for the job. Default values will <b>not</b> be determined and
+                filled in automatically.</li>
+            </ul>
+            <p>Custom payload examples:</p>
+            <ul>
+                <li><pre>{"custom_format": true, "job": "myProject"}</pre></li>
+                <li><pre>{"custom_format": true, "job": "myProject", "parameters": [{"name": "foo", "value": true, "type": "boolean"}]}</pre></li>
+                <li><pre>{"custom_format": true, "job": "myProject", "parameters": [{"name": "foo", "value": true, "type": "boolean"}, {"name": "bar", "value": "baz", "type": "string"}]}</pre></li>
+            </ul>
         </div>
     </l:ajax>
 </j:jelly>
