@@ -78,9 +78,10 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
             try {
                 GitHubRepositoryName changedRepository = new SQSGitHubRepositoryName(matcher.group(1), ownerName, repoName);
                 for (WorkflowJob job : Jenkins.getInstance().getAllItems(WorkflowJob.class)) {
-                    Collection<Trigger<?>> values = job.getTriggers().values();
-                    for (Trigger trigger : values) {
-                        if (trigger instanceof GitHubTrigger) {
+                    LOGGER.info("WorkfloJob: " + job);
+                    Collection<Trigger<?>> triggers = job.getTriggers().values();
+                    for (Trigger trigger : triggers) {
+                        if (triggerClass.isAssignableFrom(trigger.getClass())) {
                             GitHubTrigger gitHubTrigger = (GitHubTrigger) trigger;
                             LOGGER.fine("Considering to poke " + job.getFullDisplayName());
                             if (gitHubTrigger.getGitHubRepositories().contains(changedRepository)) {
