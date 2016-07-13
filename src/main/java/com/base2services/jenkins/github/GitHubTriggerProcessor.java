@@ -4,15 +4,7 @@ import com.base2services.jenkins.SqsBuildTrigger;
 import com.base2services.jenkins.trigger.TriggerProcessor;
 import com.cloudbees.jenkins.GitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubTrigger;
-import hudson.model.AbstractProject;
-import hudson.model.BooleanParameterValue;
-import hudson.model.Cause;
-import hudson.model.CauseAction;
-import hudson.model.Hudson;
-import hudson.model.Job;
-import hudson.model.ParametersAction;
-import hudson.model.ParameterValue;
-import hudson.model.StringParameterValue;
+import hudson.model.*;
 import hudson.model.queue.QueueTaskFuture;
 import hudson.security.ACL;
 import hudson.triggers.Trigger;
@@ -24,8 +16,10 @@ import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 import org.acegisecurity.Authentication;
 import org.acegisecurity.context.SecurityContextHolder;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -83,7 +77,21 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
             SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
             try {
                 GitHubRepositoryName changedRepository = new SQSGitHubRepositoryName(matcher.group(1), ownerName, repoName);
-                for (AbstractProject<?,?> job : Hudson.getInstance().getAllItems(AbstractProject.class)) {
+                for (WorkflowJob job : Jenkins.getInstance().getAllItems(WorkflowJob.class)) {
+                    Collection<Trigger<?>> values = job.getTriggers().values();
+                    for (Trigger trigger : values) {
+                        if (trigger instanceof GitHubTrigger) {
+                            GitHubTrigger gitHubTrigger = (GitHubTrigger) trigger;
+                            LOGGER.fine("Considering to poke " + job.getFullDisplayName());
+                            if (gitHubTrigger.getGitHubRepositories().contains(changedRepository)) {
+                                LOGGER.info("Poked " + job.getFullDisplayName());
+                                gitHubTrigger.onPost();
+                            } else
+                                LOGGER.fine("Skipped " + job.getFullDisplayName() + " because it doesn't have a matching repository.");
+                        }
+                    }
+                }
+                for (AbstractProject<?,?> job : Jenkins.getInstance().getAllItems(AbstractProject.class)) {
                     GitHubTrigger trigger = (GitHubTrigger) job.getTrigger(triggerClass);
                     if (trigger!=null) {
                         LOGGER.fine("Considering to poke "+job.getFullDisplayName());
