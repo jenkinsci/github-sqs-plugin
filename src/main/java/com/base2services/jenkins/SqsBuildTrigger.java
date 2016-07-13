@@ -4,6 +4,7 @@ import com.base2services.jenkins.github.SQSGitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubPushCause;
 import com.cloudbees.jenkins.GitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubTrigger;
+import com.google.common.base.Optional;
 import hudson.Extension;
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
@@ -14,6 +15,7 @@ import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.StreamTaskListener;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.apache.commons.jelly.XMLOutput;
 import org.eclipse.jgit.transport.RemoteConfig;
@@ -253,7 +255,25 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
 
         @Override
         public boolean isApplicable(Item item) {
-            return item instanceof AbstractProject;
+
+            boolean isWorkflowJob = false;
+
+            /**
+             * Checking is workflow-aggregator plugin is installed (optional dependency)
+             * https://wiki.jenkins-ci.org/display/JENKINS/Dependencies+among+plugins
+             */
+            if (Jenkins.getInstance().getPlugin("workflow-aggregator") != null) {
+                Class<?> foo;
+                try {
+                    foo = Class.forName("org.jenkinsci.plugins.workflow.job.WorkflowJob");
+                } catch (ClassNotFoundException e) {
+                    LOGGER.info("Could not find class `org.jenkinsci.plugins.workflow.job.WorkflowJob` this should not have happened as the plugin is available");
+                    foo = null;
+                }
+                isWorkflowJob = (foo != null && foo.isAssignableFrom(item.getClass()));
+            }
+
+            return (item instanceof AbstractProject || isWorkflowJob) ;
         }
 
         @Override
