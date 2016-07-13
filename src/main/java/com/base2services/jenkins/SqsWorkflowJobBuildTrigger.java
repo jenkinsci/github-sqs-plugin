@@ -6,18 +6,22 @@ import com.cloudbees.jenkins.GitHubTrigger;
 import hudson.Extension;
 import hudson.Util;
 import hudson.console.AnnotatedLargeText;
-import hudson.model.*;
+import hudson.model.Action;
+import hudson.model.Cause;
+import hudson.model.Item;
 import hudson.plugins.git.GitSCM;
 import hudson.scm.SCM;
 import hudson.triggers.Trigger;
 import hudson.triggers.TriggerDescriptor;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.StreamTaskListener;
+import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.apache.commons.jelly.XMLOutput;
 import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.jenkinsci.plugins.multiplescms.MultiSCM;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.kohsuke.github.GHException;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -38,12 +42,12 @@ import java.util.logging.Logger;
  *
  * @author aaronwalker
  */
-public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubTrigger, Runnable {
+public class SqsWorkflowJobBuildTrigger extends Trigger<WorkflowJob> implements GitHubTrigger, Runnable {
 
-    private static final Logger LOGGER = Logger.getLogger(SqsBuildTrigger.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(SqsWorkflowJobBuildTrigger.class.getName());
 
     @DataBoundConstructor
-    public SqsBuildTrigger() {
+    public SqsWorkflowJobBuildTrigger() {
     }
 
     /**
@@ -62,7 +66,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
      * Returns the file that records the last/current polling activity.
      */
     public File getLogFile() {
-        return new File(job.getRootDir(),"sqs-polling.log");
+        return new File(job.getRootDir(), "sqs-polling.log");
     }
 
     public void run() {
@@ -72,10 +76,10 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
             try {
                 PrintStream logger = listener.getLogger();
                 long start = System.currentTimeMillis();
-                logger.println("Started on "+ DateFormat.getDateTimeInstance().format(new Date()));
+                logger.println("Started on " + DateFormat.getDateTimeInstance().format(new Date()));
                 boolean result = job.poll(listener).hasChanges();
-                logger.println("Done. Took "+ Util.getTimeSpanString(System.currentTimeMillis() - start));
-                if(result) {
+                logger.println("Done. Took " + Util.getTimeSpanString(System.currentTimeMillis() - start));
+                if (result) {
                     logger.println("Changes found");
                     // Fix for JENKINS-16617, JENKINS-16669
                     // The Cause instance needs to have a unique identity (when equals() is called), otherwise
@@ -83,10 +87,9 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
                     // has already been processed.
                     if (job.scheduleBuild(new Cause.RemoteCause("GitHub via SQS", "SQS poll initiated on " +
                             DateFormat.getDateTimeInstance().format(new Date(start))))) {
-                      logger.println("Job queued");
-                    }
-                    else {
-                      logger.println("Job NOT queued - it was determined that this job has been queued already.");
+                        logger.println("Job queued");
+                    } else {
+                        logger.println("Job NOT queued - it was determined that this job has been queued already.");
                     }
                 } else {
                     logger.println("No changes");
@@ -95,13 +98,13 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
                 listener.close();
             }
         } catch (IOException e) {
-            LOGGER.log(Level.SEVERE,"Failed to record SCM polling",e);
+            LOGGER.log(Level.SEVERE, "Failed to record SCM polling", e);
         }
     }
 
     @Override
     public DescriptorImpl getDescriptor() {
-        return (DescriptorImpl)super.getDescriptor();
+        return (DescriptorImpl) super.getDescriptor();
     }
 
     /**
@@ -111,15 +114,28 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     @Override
     public Set<GitHubRepositoryName> getGitHubRepositories() {
         Set<GitHubRepositoryName> r = new HashSet<GitHubRepositoryName>();
-        if (Hudson.getInstance().getPlugin("multiple-scms") != null && job != null
-                && job.getScm() instanceof MultiSCM) {
-            MultiSCM multiSCM = (MultiSCM) job.getScm();
+
+        MultiSCM multiSCM = null;
+        boolean hasMultiSCM = false;
+
+        for (SCM scm : job.getSCMs()) {
+            if (scm instanceof MultiSCM) {
+                hasMultiSCM = true;
+                multiSCM = (MultiSCM) scm;
+                break;
+            }
+        }
+
+        if (Jenkins.getInstance().getPlugin("multiple-scms") != null && job != null
+                && hasMultiSCM) {
             List<SCM> scmList = multiSCM.getConfiguredSCMs();
             for (SCM scm : scmList) {
                 addRepositories(r, scm);
             }
         } else if (job != null) {
-            addRepositories(r, job.getScm());
+            for (SCM scm : job.getSCMs()) {
+                addRepositories(r, scm);
+            }
         }
         return r;
     }
@@ -143,9 +159,9 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     }
 
     @Override
-    public void start(AbstractProject project, boolean newInstance) {
+    public void start(WorkflowJob project, boolean newInstance) {
         super.start(project, newInstance);
-        if(newInstance && getDescriptor().isManageHook()) {
+        if (newInstance && getDescriptor().isManageHook()) {
             // make sure we have hooks installed. do this lazily to avoid blocking the UI thread.
             final Set<GitHubRepositoryName> names = getGitHubRepositories();
 
@@ -158,12 +174,12 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
                                 //Currently creates the sqs hook based on the details of the
                                 //first sqs profile. Need to find a clean way to map the profile
                                 //to the github repo so we know how to populate the hook
-                                if (createJenkinsHook(repo,getDescriptor().getSqsProfiles().get(0))) {
-                                    LOGGER.info("Added GitHub SQS webhook for "+name);
+                                if (createJenkinsHook(repo, getDescriptor().getSqsProfiles().get(0))) {
+                                    LOGGER.info("Added GitHub SQS webhook for " + name);
                                     continue OUTER;
                                 }
                             } catch (Throwable e) {
-                                LOGGER.log(Level.WARNING, "Failed to add GitHub webhook for "+name, e);
+                                LOGGER.log(Level.WARNING, "Failed to add GitHub webhook for " + name, e);
                             }
                         }
                     }
@@ -188,14 +204,14 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
     }
 
     private boolean createJenkinsHook(GHRepository repo, SqsProfile profile) {
-        if(profile == null) {
+        if (profile == null) {
             return false;
         }
         try {
-            Map<String,String> config = new HashMap<String, String>();
-            config.put("aws_access_key",profile.getAWSAccessKeyId());
-            config.put("aws_secret_key",profile.getAWSSecretKey());
-            config.put("sqs_queue_name",profile.getSqsQueue());
+            Map<String, String> config = new HashMap<String, String>();
+            config.put("aws_access_key", profile.getAWSAccessKeyId());
+            config.put("aws_secret_key", profile.getAWSSecretKey());
+            config.put("sqs_queue_name", profile.getSqsQueue());
             repo.createHook("sqsqueue", config, null, true);
             return true;
         } catch (IOException e) {
@@ -205,7 +221,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
 
     public final class SqsBuildTriggerPollingAction implements Action {
 
-        public AbstractProject<?,?> getOwner() {
+        public WorkflowJob getOwner() {
             return job;
         }
 
@@ -226,7 +242,7 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
         }
 
         public void writeLogTo(XMLOutput out) throws IOException {
-            new AnnotatedLargeText<SqsBuildTriggerPollingAction>(getLogFile(), Charset.defaultCharset(),true,this).writeHtmlTo(0,out.asWriter());
+            new AnnotatedLargeText<SqsBuildTriggerPollingAction>(getLogFile(), Charset.defaultCharset(), true, this).writeHtmlTo(0, out.asWriter());
         }
     }
 
@@ -244,7 +260,25 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
 
         @Override
         public boolean isApplicable(Item item) {
-            return item instanceof AbstractProject;
+
+            boolean isWorkflowJob = false;
+
+            /**
+             * Checking is workflow-aggregator plugin is installed (optional dependency)
+             * https://wiki.jenkins-ci.org/display/JENKINS/Dependencies+among+plugins
+             */
+            if (Jenkins.getInstance().getPlugin("workflow-aggregator") != null) {
+                Class<?> foo;
+                try {
+                    foo = Class.forName("org.jenkinsci.plugins.workflow.job.WorkflowJob");
+                } catch (ClassNotFoundException e) {
+                    LOGGER.info("Could not find class `org.jenkinsci.plugins.workflow.job.WorkflowJob` this should not have happened as the plugin is available");
+                    foo = null;
+                }
+                isWorkflowJob = (foo != null && foo.isAssignableFrom(item.getClass()));
+            }
+
+            return isWorkflowJob;
         }
 
         @Override
@@ -261,15 +295,15 @@ public class SqsBuildTrigger extends Trigger<AbstractProject> implements GitHubT
             JSONObject sqs = json.getJSONObject("sqsProfiles");
             JSONObject hookMode = json.getJSONObject("sqsHookMode");
             manageHook = "auto".equals(hookMode.getString("value"));
-            sqsProfiles = req.bindJSONToList(SqsProfile.class,sqs);
-            credentials = req.bindJSONToList(Credential.class,hookMode.get("credentials"));
+            sqsProfiles = req.bindJSONToList(SqsProfile.class, sqs);
+            credentials = req.bindJSONToList(Credential.class, hookMode.get("credentials"));
             save();
             return true;
         }
 
         public static DescriptorImpl get() {
             return Trigger.all().get(DescriptorImpl.class);
-        }        
+        }
 
         public List<SqsProfile> getSqsProfiles() {
             return sqsProfiles;

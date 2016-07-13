@@ -1,7 +1,7 @@
 package com.base2services.jenkins;
 
-import com.cloudbees.jenkins.GitHubPushTrigger;
 import com.cloudbees.jenkins.GitHubRepositoryName;
+import com.cloudbees.jenkins.GitHubTrigger;
 import hudson.Extension;
 import hudson.model.AbstractProject;
 import hudson.model.Hudson;
@@ -13,7 +13,6 @@ import org.kohsuke.github.GHHook;
 import org.kohsuke.github.GHRepository;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,7 +35,7 @@ public class SqsHookCleaner extends PeriodicWork {
     /**
      * Called when a {@link SqsBuildTrigger} is about to be removed.
      */
-    synchronized void onStop(SqsBuildTrigger trigger) {
+    synchronized void onStop(GitHubTrigger trigger) {
         couldHaveBeenRemoved.addAll(trigger.getGitHubRepositories());
     }
 
