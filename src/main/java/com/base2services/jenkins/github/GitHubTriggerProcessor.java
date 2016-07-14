@@ -1,18 +1,11 @@
 package com.base2services.jenkins.github;
 
 import com.base2services.jenkins.SqsBuildTrigger;
+import com.base2services.jenkins.SqsWorkflowJobBuildTrigger;
 import com.base2services.jenkins.trigger.TriggerProcessor;
 import com.cloudbees.jenkins.GitHubRepositoryName;
 import com.cloudbees.jenkins.GitHubTrigger;
-import hudson.model.AbstractProject;
-import hudson.model.BooleanParameterValue;
-import hudson.model.Cause;
-import hudson.model.CauseAction;
-import hudson.model.Hudson;
-import hudson.model.Job;
-import hudson.model.ParametersAction;
-import hudson.model.ParameterValue;
-import hudson.model.StringParameterValue;
+import hudson.model.*;
 import hudson.model.queue.QueueTaskFuture;
 import hudson.security.ACL;
 import hudson.triggers.Trigger;
@@ -24,8 +17,10 @@ import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
 import org.acegisecurity.Authentication;
 import org.acegisecurity.context.SecurityContextHolder;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -55,15 +50,14 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
             // Note that the payload will again be extracted from JSON at the start of the processGitHubPayload function.
             // Leaving it this way so as not to change the contract, to be backwards compatible with any integrations.
             processGitHubPayload(payload, SqsBuildTrigger.class);
-        }
-        else {
+        } else {
             LOGGER.warning("Unable to determine the format of the SQS message.");
         }
     }
 
     public void processGitHubPayload(String payload, Class<? extends Trigger> triggerClass) {
         JSONObject json = extractJsonFromPayload(payload);
-        if(json == null) {
+        if (json == null) {
             LOGGER.warning("sqs message contains unknown payload format");
             return;
         }
@@ -83,33 +77,54 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
             SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
             try {
                 GitHubRepositoryName changedRepository = new SQSGitHubRepositoryName(matcher.group(1), ownerName, repoName);
-                for (AbstractProject<?,?> job : Hudson.getInstance().getAllItems(AbstractProject.class)) {
+                for (AbstractProject<?, ?> job : Jenkins.getInstance().getAllItems(AbstractProject.class)) {
                     GitHubTrigger trigger = (GitHubTrigger) job.getTrigger(triggerClass);
-                    if (trigger!=null) {
-                        LOGGER.fine("Considering to poke "+job.getFullDisplayName());
+                    if (trigger != null) {
+                        LOGGER.fine("Considering to poke " + job.getFullDisplayName());
                         if (trigger.getGitHubRepositories().contains(changedRepository)) {
-                            LOGGER.info("Poked "+job.getFullDisplayName());
+                            LOGGER.info("Poked " + job.getFullDisplayName());
                             trigger.onPost();
                         } else
-                            LOGGER.fine("Skipped "+job.getFullDisplayName()+" because it doesn't have a matching repository.");
+                            LOGGER.fine("Skipped " + job.getFullDisplayName() + " because it doesn't have a matching repository.");
+                    }
+                }
+
+                //WorkflowJob stuff
+                for (WorkflowJob job : Jenkins.getInstance().getAllItems(WorkflowJob.class)) {
+                    LOGGER.info("WorkfloJob: " + job);
+
+                    Collection<Trigger<?>> triggers = job.getTriggers().values();
+                    for (Trigger trigger : triggers) {
+                        LOGGER.info("trigger: " + trigger);
+                        LOGGER.info("trigger instanceof SqsWorkflowJobBuildTrigger: " + (trigger instanceof SqsWorkflowJobBuildTrigger));
+                        if (trigger instanceof SqsWorkflowJobBuildTrigger) {
+
+                            SqsWorkflowJobBuildTrigger gitHubTrigger = (SqsWorkflowJobBuildTrigger) trigger;
+                            LOGGER.info("Considering to poke " + job.getFullDisplayName());
+                            if (gitHubTrigger.getGitHubRepositories().contains(changedRepository)) {
+                                LOGGER.info("Poked " + job.getFullDisplayName());
+                                gitHubTrigger.onPost();
+                            } else
+                                LOGGER.info("Skipped " + job.getFullDisplayName() + " because it doesn't have a matching repository.");
+                        }
                     }
                 }
             } finally {
                 SecurityContextHolder.getContext().setAuthentication(old);
             }
         } else {
-            LOGGER.warning("Malformed repo url "+repoUrl);
+            LOGGER.warning("Malformed repo url " + repoUrl);
         }
     }
 
     public JSONObject extractJsonFromPayload(String payload) {
         JSONObject json = JSONObject.fromObject(payload);
-        if(json.has("Type")) {
+        if (json.has("Type")) {
             String msg = json.getString("Message");
-            if(msg != null) {
+            if (msg != null) {
                 char ch[] = msg.toCharArray();
-                if((ch[0] == '"') && (ch[msg.length()-1]) == '"') {
-                    msg = msg.substring(1,msg.length()-1); //remove the leading and trailing double quotes
+                if ((ch[0] == '"') && (ch[msg.length() - 1]) == '"') {
+                    msg = msg.substring(1, msg.length() - 1); //remove the leading and trailing double quotes
                 }
                 return JSONObject.fromObject(msg);
             }
@@ -137,7 +152,7 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
         SecurityContextHolder.getContext().setAuthentication(ACL.SYSTEM);
         try {
             Jenkins jenkins = Jenkins.getInstance();
-            for (Job job: jenkins.getAllItems(Job.class)) {
+            for (Job job : jenkins.getAllItems(Job.class)) {
                 String jobName = job.getDisplayName();
                 if (jobName.equals(jobToTrigger)) {
                     // Custom triggers operate on Parameterized jobs only
@@ -145,10 +160,11 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
                         // Make sure the job is configured to use the SQS trigger
                         ParameterizedJobMixIn.ParameterizedJob pJob = (ParameterizedJobMixIn.ParameterizedJob) job;
                         final Map<TriggerDescriptor, Trigger<?>> pJobTriggers = pJob.getTriggers();
-                        SqsBuildTrigger.DescriptorImpl descriptor = jenkins.getDescriptorByType(SqsBuildTrigger.DescriptorImpl.class);
-                        if (!pJobTriggers.containsKey(descriptor)) {
-                            LOGGER.warning("The job " + jobName + " is not configured to use the SQS trigger.");
-                        } else {
+
+                        TriggerDescriptor jobSqsTriggerDescriptor = jenkins.getDescriptorByType(SqsBuildTrigger.DescriptorImpl.get().getClass());
+                        TriggerDescriptor workflowSqsTriggerDescriptor = jenkins.getDescriptorByType(SqsWorkflowJobBuildTrigger.DescriptorImpl.get().getClass());
+
+                        if (pJobTriggers.containsKey(jobSqsTriggerDescriptor) || pJobTriggers.containsKey(workflowSqsTriggerDescriptor)) {
                             final Job theJob = job;
                             ParameterizedJobMixIn mixin = new ParameterizedJobMixIn() {
                                 @Override
@@ -163,6 +179,8 @@ public class GitHubTriggerProcessor implements TriggerProcessor {
                             if (queueTaskFuture == null) {
                                 LOGGER.warning("Unable to schedule the job " + jobName);
                             }
+                        } else {
+                            LOGGER.warning("The job " + jobName + " is not configured to use the SQS trigger.");
                         }
                     } else {
                         LOGGER.warning("The job " + jobName + " is not configured as a Parameterized Job.");

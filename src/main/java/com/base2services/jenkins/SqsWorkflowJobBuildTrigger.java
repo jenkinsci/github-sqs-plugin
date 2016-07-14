@@ -3,7 +3,6 @@ package com.base2services.jenkins;
 import com.cloudbees.jenkins.GitHubRepositoryName;
 import hudson.Extension;
 import hudson.Util;
-import hudson.model.AbstractProject;
 import hudson.model.Cause;
 import hudson.model.Item;
 import hudson.scm.SCM;
@@ -14,6 +13,9 @@ import hudson.util.StreamTaskListener;
 import jenkins.model.Jenkins;
 import net.sf.json.JSONObject;
 import org.jenkinsci.plugins.multiplescms.MultiSCM;
+import org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition;
+import org.jenkinsci.plugins.workflow.flow.FlowDefinition;
+import org.jenkinsci.plugins.workflow.job.WorkflowJob;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 
@@ -31,12 +33,12 @@ import java.util.logging.Logger;
  *
  * @author aaronwalker
  */
-public class SqsBuildTrigger extends AbstractSqsGithubTrigger<AbstractProject> {
+public class SqsWorkflowJobBuildTrigger extends AbstractSqsGithubTrigger<WorkflowJob> {
 
-    private static final Logger LOGGER = Logger.getLogger(SqsBuildTrigger.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(SqsWorkflowJobBuildTrigger.class.getName());
 
     @DataBoundConstructor
-    public SqsBuildTrigger() {
+    public SqsWorkflowJobBuildTrigger() {
     }
 
     @Override
@@ -77,24 +79,34 @@ public class SqsBuildTrigger extends AbstractSqsGithubTrigger<AbstractProject> {
         }
     }
 
+
     /**
      * Does this project read from a repository of the given user name and the
      * given repository name?
      */
     @Override
     public Set<GitHubRepositoryName> getGitHubRepositories() {
-        Set<GitHubRepositoryName> r = new HashSet<GitHubRepositoryName>();
-        if (Jenkins.getInstance().getPlugin("multiple-scms") != null && job != null
-                && job.getScm() instanceof MultiSCM) {
-            MultiSCM multiSCM = (MultiSCM) job.getScm();
-            List<SCM> scmList = multiSCM.getConfiguredSCMs();
-            for (SCM scm : scmList) {
-                addRepositories(r, scm);
+        Set<GitHubRepositoryName> gitHubRepositoryNames = new HashSet<GitHubRepositoryName>();
+        for (SCM scm : job.getSCMs()) {
+            if (Jenkins.getInstance().getPlugin("multiple-scms") != null && scm instanceof MultiSCM) {
+                MultiSCM multiSCM = (MultiSCM) scm;
+                for (SCM _scm : multiSCM.getConfiguredSCMs()) {
+                    addRepositories(gitHubRepositoryNames, _scm);
+                }
+                break;
+            } else {
+                addRepositories(gitHubRepositoryNames, scm);
             }
-        } else if (job != null) {
-            addRepositories(r, job.getScm());
         }
-        return r;
+
+        // Checking the WorkflowJobRepo
+        FlowDefinition definition = job.getDefinition();
+        if (definition instanceof CpsScmFlowDefinition) {
+            CpsScmFlowDefinition cpsScmFlowDefinition = (CpsScmFlowDefinition) definition;
+            addRepositories(gitHubRepositoryNames, cpsScmFlowDefinition.getScm());
+        }
+
+        return gitHubRepositoryNames;
     }
 
     @Extension
@@ -114,7 +126,25 @@ public class SqsBuildTrigger extends AbstractSqsGithubTrigger<AbstractProject> {
 
         @Override
         public boolean isApplicable(Item item) {
-            return item instanceof AbstractProject;
+
+            boolean isWorkflowJob = false;
+
+            /**
+             * Checking is workflow-aggregator plugin is installed (optional dependency)
+             * https://wiki.jenkins-ci.org/display/JENKINS/Dependencies+among+plugins
+             */
+            if (Jenkins.getInstance().getPlugin("workflow-aggregator") != null) {
+                Class<?> foo;
+                try {
+                    foo = Class.forName("org.jenkinsci.plugins.workflow.job.WorkflowJob");
+                } catch (ClassNotFoundException e) {
+                    LOGGER.info("Could not find class `org.jenkinsci.plugins.workflow.job.WorkflowJob` this should not have happened as the plugin is available");
+                    foo = null;
+                }
+                isWorkflowJob = (foo != null && foo.isAssignableFrom(item.getClass()));
+            }
+
+            return isWorkflowJob;
         }
 
         @Override
