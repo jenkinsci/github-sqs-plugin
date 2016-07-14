@@ -66,7 +66,8 @@ public class SqsHookCleaner extends PeriodicWork {
         for (GitHubRepositoryName r : names) {
             for (GHRepository repo : r.resolve()) {
                 try {
-                    removeHook(repo, Trigger.all().get(SqsBuildTrigger.DescriptorImpl.class).getSqsProfiles());
+                    removeHook(repo, Trigger.all().get(SqsBuildTrigger.DescriptorImpl.get().getClass()).getSqsProfiles());
+                    removeHook(repo, Trigger.all().get(SqsWorkflowJobBuildTrigger.DescriptorImpl.get().getClass()).getSqsProfiles());
                     LOGGER.info("Removed sqs queue hook from " + r + "");
                     continue OUTER;
                 } catch (Throwable e) {

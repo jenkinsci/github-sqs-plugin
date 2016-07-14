@@ -36,7 +36,11 @@ public class SqsQueueHandler extends PeriodicWork {
     @Override
     protected void doRun() throws Exception {
         if(queue.getInProgress().size() == 0) {
-            List<SqsProfile> profiles = SqsBuildTrigger.DescriptorImpl.get().getSqsProfiles();
+            List<SqsProfile> sqsProfilesJob = SqsBuildTrigger.DescriptorImpl.get().getSqsProfiles();
+            List<SqsProfile> sqsProfilesWorkflow= SqsWorkflowJobBuildTrigger.DescriptorImpl.get().getSqsProfiles();
+            ArrayList<SqsProfile> profiles = new ArrayList<SqsProfile>();
+            profiles.addAll(sqsProfilesJob);
+            profiles.addAll(sqsProfilesWorkflow);
             if (profiles.size() != 0) {
                 queue.setExecutors(Executors.newFixedThreadPool(profiles.size()));
                 for (final SqsProfile profile : profiles) {
