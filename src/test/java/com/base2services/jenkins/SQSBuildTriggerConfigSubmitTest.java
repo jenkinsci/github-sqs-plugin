@@ -54,9 +54,9 @@ public class SQSBuildTriggerConfigSubmitTest extends HudsonTestCase {
 
     private WebClient configureWebClient() {
         WebClient client = new WebClient();
-        client.setThrowExceptionOnFailingStatusCode(false);
-        client.setCssEnabled(false);
-        client.setJavaScriptEnabled(true);
+//        client.setThrowExceptionOnFailingStatusCode(false);
+//        client.setCssEnabled(false);
+//        client.setJavaScriptEnabled(true);
         return client;
     }
 

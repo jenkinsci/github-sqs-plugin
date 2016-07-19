@@ -4,11 +4,12 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
-import com.base2services.jenkins.trigger.TriggerProcessor;
+import com.cloudbees.jenkins.GitHubWebHook;
 import hudson.Extension;
 import hudson.model.PeriodicWork;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.TimeUnit2;
+import org.kohsuke.github.GHEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,12 +31,12 @@ public class SqsQueueHandler extends PeriodicWork {
 
     @Override
     public long getRecurrencePeriod() {
-        return TimeUnit2.SECONDS.toMillis(2);
+        return TimeUnit2.SECONDS.toMillis(5);
     }
 
     @Override
     protected void doRun() throws Exception {
-        if(queue.getInProgress().size() == 0) {
+        if (queue.getInProgress().size() == 0) {
             List<SqsProfile> profiles = SqsBuildTrigger.DescriptorImpl.get().getSqsProfiles();
             if (profiles.size() != 0) {
                 queue.setExecutors(Executors.newFixedThreadPool(profiles.size()));
@@ -64,26 +65,22 @@ public class SqsQueueHandler extends PeriodicWork {
             LOGGER.fine("looking for build triggers on queue:" + profile.sqsQueue);
             AmazonSQS sqs = profile.getSQSClient();
             String queueUrl = profile.getQueueUrl();
-            TriggerProcessor processor = profile.getTriggerProcessor();
             ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl);
             receiveMessageRequest.setWaitTimeSeconds(20);
-            List<Message> messages = new ArrayList<Message>();
-            // Try to pick up the messages from SQS, and log if an error was encountered,
-            // for example a 403 Access to the resource is denied.
+            List<Message> messages = new ArrayList<>();
             try {
                 messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
 
             } catch (Exception ex) {
                 LOGGER.warning("Unable to retrieve messages from the queue. " + ex.getMessage());
             }
-            for(Message message : messages) {
+            for (Message message : messages) {
                 //Process the message payload
                 try {
-                    LOGGER.fine("got payload\n" + message.getBody());
-                    processor.trigger(message.getBody());
-
+                    LOGGER.info("got payload\n" + message.getBody());
+                    GitHubWebHook.get().doIndex(GHEvent.PUSH, message.getBody());
                 } catch (Exception ex) {
-                    LOGGER.log(Level.SEVERE,"unable to trigger builds " + ex.getMessage(),ex);
+                    LOGGER.log(Level.SEVERE, "unable to trigger builds " + ex.getMessage(), ex);
                 } finally {
                     //delete the message even if it failed
                     sqs.deleteMessage(new DeleteMessageRequest()
