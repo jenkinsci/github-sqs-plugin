@@ -9,6 +9,7 @@ import hudson.Extension;
 import hudson.model.PeriodicWork;
 import hudson.util.SequentialExecutionQueue;
 import hudson.util.TimeUnit2;
+import jenkins.github.aws.parser.MessageParser;
 import org.kohsuke.github.GHEvent;
 
 import java.util.ArrayList;
@@ -28,6 +29,8 @@ public class SqsQueueHandler extends PeriodicWork {
     private static final Logger LOGGER = Logger.getLogger(SqsQueueHandler.class.getName());
 
     private transient final SequentialExecutionQueue queue = new SequentialExecutionQueue(Executors.newFixedThreadPool(2));
+
+    private MessageParser messageParser = new MessageParser();
 
     @Override
     public long getRecurrencePeriod() {
@@ -68,17 +71,23 @@ public class SqsQueueHandler extends PeriodicWork {
             ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(queueUrl);
             receiveMessageRequest.setWaitTimeSeconds(20);
             List<Message> messages = new ArrayList<>();
+
             try {
                 messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
-
             } catch (Exception ex) {
                 LOGGER.warning("Unable to retrieve messages from the queue. " + ex.getMessage());
             }
+
             for (Message message : messages) {
                 //Process the message payload
                 try {
-                    LOGGER.info("got payload\n" + message.getBody());
-                    GitHubWebHook.get().doIndex(GHEvent.PUSH, message.getBody());
+                    String awsMessage = message.getBody();
+                    LOGGER.fine("Received Message from AWS: " + awsMessage);
+
+                    String actualMessage = messageParser.extractActualGithubMessage(awsMessage);
+                    LOGGER.fine("Actual Github Message: " + actualMessage);
+
+                    GitHubWebHook.get().doIndex(GHEvent.PUSH, actualMessage);
                 } catch (Exception ex) {
                     LOGGER.log(Level.SEVERE, "unable to trigger builds " + ex.getMessage(), ex);
                 } finally {
@@ -88,6 +97,7 @@ public class SqsQueueHandler extends PeriodicWork {
                             .withReceiptHandle(message.getReceiptHandle()));
                 }
             }
+
         }
     }
 }
