@@ -4,6 +4,10 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
+//import com.amazonaws.services.sqs.model.ListQueuesResult;
+//import com.amazonaws.services.sqs.model.SendMessageRequest;
+//import com.base2services.jenkins.github.GitHubTriggerProcessor;
+//import com.base2services.jenkins.trigger.TriggerProcessor;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -26,6 +30,7 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public final String awsAccessKeyId;
     public final Secret awsSecretAccessKey;
     public final String sqsQueue;
+    private final boolean awsUseRole;
 
     static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
     static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
@@ -34,9 +39,15 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
 
     @DataBoundConstructor
-    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue) {
-        this.awsAccessKeyId = awsAccessKeyId;
-        this.awsSecretAccessKey = awsSecretAccessKey;
+    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue, boolean awsUseRole) {
+        this.awsUseRole = awsUseRole;
+        if (awsUseRole) {
+            this.awsAccessKeyId = "";
+            this.awsSecretAccessKey = null;
+        } else {
+            this.awsAccessKeyId = awsAccessKeyId;
+            this.awsSecretAccessKey = awsSecretAccessKey;
+        }
         this.sqsQueue = sqsQueue;
         this.urlSpecified = Pattern.matches(queueUrlRegex, sqsQueue);
         this.client = null;
@@ -48,6 +59,14 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
     public String getAWSSecretKey() {
         return awsSecretAccessKey.getPlainText();
+    }
+
+    public final boolean getAWSUseRole() {
+        return this.awsUseRole;
+    }
+
+    public boolean isUseRole() {
+        return awsUseRole;
     }
 
     public AmazonSQS getSQSClient() {
@@ -97,10 +116,12 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
             return ""; // unused
         }
 
-        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue) throws IOException {
+        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue, @QueryParameter boolean awsUseRole) throws IOException {
             boolean valid = false;
             try {
-                SqsProfile profile = new SqsProfile(awsAccessKeyId, awsSecretAccessKey, sqsQueue);
+
+                SqsProfile profile = new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue,awsUseRole);
+
                 String queue = profile.getQueueUrl();
                 if (queue != null) {
                     return FormValidation.ok("Verified SQS Queue " + queue);
