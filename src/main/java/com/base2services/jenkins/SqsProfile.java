@@ -4,10 +4,6 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
-//import com.amazonaws.services.sqs.model.ListQueuesResult;
-//import com.amazonaws.services.sqs.model.SendMessageRequest;
-//import com.base2services.jenkins.github.GitHubTriggerProcessor;
-//import com.base2services.jenkins.trigger.TriggerProcessor;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -71,7 +67,11 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
     public AmazonSQS getSQSClient() {
         if (client == null) {
-            client = new AmazonSQSClient(this);
+            if (!this.awsUseRole) {
+                client = new AmazonSQSClient(this);
+            } else {
+                client = new AmazonSQSClient();
+            }
             if (urlSpecified) {
                 Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
                 if (endpointMatcher.find()) {
