@@ -26,6 +26,7 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public final String awsAccessKeyId;
     public final Secret awsSecretAccessKey;
     public final String sqsQueue;
+    private final boolean awsUseRole;
 
     static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
     static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
@@ -34,9 +35,15 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
 
     @DataBoundConstructor
-    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue) {
-        this.awsAccessKeyId = awsAccessKeyId;
-        this.awsSecretAccessKey = awsSecretAccessKey;
+    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue, boolean awsUseRole) {
+        this.awsUseRole = awsUseRole;
+        if (awsUseRole) {
+            this.awsAccessKeyId = "";
+            this.awsSecretAccessKey = null;
+        } else {
+            this.awsAccessKeyId = awsAccessKeyId;
+            this.awsSecretAccessKey = awsSecretAccessKey;
+        }
         this.sqsQueue = sqsQueue;
         this.urlSpecified = Pattern.matches(queueUrlRegex, sqsQueue);
         this.client = null;
@@ -50,9 +57,21 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
         return awsSecretAccessKey.getPlainText();
     }
 
+    public final boolean getAWSUseRole() {
+        return this.awsUseRole;
+    }
+
+    public boolean isUseRole() {
+        return awsUseRole;
+    }
+
     public AmazonSQS getSQSClient() {
         if (client == null) {
-            client = new AmazonSQSClient(this);
+            if (!this.awsUseRole) {
+                client = new AmazonSQSClient(this);
+            } else {
+                client = new AmazonSQSClient();
+            }
             if (urlSpecified) {
                 Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
                 if (endpointMatcher.find()) {
@@ -97,10 +116,12 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
             return ""; // unused
         }
 
-        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue) throws IOException {
+        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue, @QueryParameter boolean awsUseRole) throws IOException {
             boolean valid = false;
             try {
-                SqsProfile profile = new SqsProfile(awsAccessKeyId, awsSecretAccessKey, sqsQueue);
+
+                SqsProfile profile = new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue,awsUseRole);
+
                 String queue = profile.getQueueUrl();
                 if (queue != null) {
                     return FormValidation.ok("Verified SQS Queue " + queue);

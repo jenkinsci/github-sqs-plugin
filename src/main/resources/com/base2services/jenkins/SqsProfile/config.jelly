@@ -3,11 +3,14 @@
   <f:entry title="${%Queue Name or URL}" field="sqsQueue">
     <f:textbox/>
   </f:entry>
+  <f:entry title="Use IAM Role" field="awsUseRole">
+    <f:checkbox  checked="${instance.isUseRole()}"/>
+  </f:entry>
   <f:entry title="${%Access Key}" field="awsAccessKeyId">
     <f:textbox/>
   </f:entry>
   <f:entry title="${%Secret Key}" field="awsSecretAccessKey">
     <f:password/>
   </f:entry>
-  <f:validateButton title="${%Test Access}" with="awsAccessKeyId,awsSecretAccessKey,sqsQueue" method="validate"/>
+  <f:validateButton title="${%Test Access}" with="awsAccessKeyId,awsSecretAccessKey,sqsQueue, awsUseRole" method="validate"/>
 </j:jelly>
