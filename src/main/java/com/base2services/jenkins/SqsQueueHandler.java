@@ -87,7 +87,21 @@ public class SqsQueueHandler extends PeriodicWork {
                     String actualMessage = messageParser.extractActualGithubMessage(awsMessage);
                     LOGGER.fine("Actual Github Message: " + actualMessage);
 
-                    GitHubWebHook.get().doIndex(GHEvent.PUSH, actualMessage);
+
+                    GHEvent event  = messageParser.getGithubEvent(awsMessage);
+                    LOGGER.fine("Github event type: " + event.toString());
+
+                    switch (event) {
+                        case PUSH :
+                            GitHubWebHook.get().doIndex(GHEvent.PUSH, actualMessage);
+                            break;
+                        case PULL_REQUEST:
+                            GitHubWebHook.get().doIndex(GHEvent.PULL_REQUEST, actualMessage);
+                            break;
+                        default:
+                            LOGGER.warning("No trigger setup for this event type: " + event.toString());
+                    }
+
                 } catch (Exception ex) {
                     LOGGER.log(Level.SEVERE, "unable to trigger builds " + ex.getMessage(), ex);
                 } finally {
