@@ -4,9 +4,6 @@ import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
-import com.amazonaws.services.sqs.model.ListQueuesResult;
-import com.base2services.jenkins.github.GitHubTriggerProcessor;
-import com.base2services.jenkins.trigger.TriggerProcessor;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
 import hudson.model.Descriptor;
@@ -16,19 +13,20 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.IOException;
-import java.util.regex.Pattern;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * SqsProfile to access SQS
  *
  * @author aaronwalker
  */
-public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements AWSCredentials{
+public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements AWSCredentials {
 
     public final String awsAccessKeyId;
     public final Secret awsSecretAccessKey;
     public final String sqsQueue;
+    private final boolean awsUseRole;
 
     static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
     static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
@@ -37,9 +35,15 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
 
     @DataBoundConstructor
-    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue) {
-        this.awsAccessKeyId = awsAccessKeyId;
-        this.awsSecretAccessKey = awsSecretAccessKey;
+    public SqsProfile(String awsAccessKeyId, Secret awsSecretAccessKey, String sqsQueue, boolean awsUseRole) {
+        this.awsUseRole = awsUseRole;
+        if (awsUseRole) {
+            this.awsAccessKeyId = "";
+            this.awsSecretAccessKey = null;
+        } else {
+            this.awsAccessKeyId = awsAccessKeyId;
+            this.awsSecretAccessKey = awsSecretAccessKey;
+        }
         this.sqsQueue = sqsQueue;
         this.urlSpecified = Pattern.matches(queueUrlRegex, sqsQueue);
         this.client = null;
@@ -53,12 +57,24 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
         return awsSecretAccessKey.getPlainText();
     }
 
+    public final boolean getAWSUseRole() {
+        return this.awsUseRole;
+    }
+
+    public boolean isUseRole() {
+        return awsUseRole;
+    }
+
     public AmazonSQS getSQSClient() {
-        if(client == null) {
-            client =  new AmazonSQSClient(this);
-            if(urlSpecified) {
+        if (client == null) {
+            if (!this.awsUseRole) {
+                client = new AmazonSQSClient(this);
+            } else {
+                client = new AmazonSQSClient();
+            }
+            if (urlSpecified) {
                 Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
-                if(endpointMatcher.find()) {
+                if (endpointMatcher.find()) {
                     String endpoint = endpointMatcher.group(1);
                     client.setEndpoint(endpoint);
                 }
@@ -73,28 +89,24 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
     public String getQueueUrl() {
         return urlSpecified ? sqsQueue
-                            : createQueue(getSQSClient(), sqsQueue);
+                : createQueue(getSQSClient(), sqsQueue);
     }
 
     /**
      * Create a Amazon SQS queue if it does already exists
-     * @param sqs  Amazon SQS client
+     *
+     * @param sqs   Amazon SQS client
      * @param queue the name of the queue
-     * @return  the queue url
+     * @return the queue url
      */
     private String createQueue(AmazonSQS sqs, String queue) {
-        for(String url : sqs.listQueues().getQueueUrls()) {
-            if(url.endsWith("/" + queue)) {
+        for (String url : sqs.listQueues().getQueueUrls()) {
+            if (url.endsWith("/" + queue)) {
                 return url;
             }
         }
         //The queue wasn't found so we will create it
         return sqs.createQueue(new CreateQueueRequest(queue)).getQueueUrl();
-    }
-
-    //TODO: refactor this so that it's part of the selection process when enabling a this trigger on a job/project
-    public TriggerProcessor getTriggerProcessor() {
-        return new GitHubTriggerProcessor();
     }
 
     @Extension
@@ -104,12 +116,14 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
             return ""; // unused
         }
 
-        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue) throws IOException {
+        public FormValidation doValidate(@QueryParameter String awsAccessKeyId, @QueryParameter Secret awsSecretAccessKey, @QueryParameter String sqsQueue, @QueryParameter boolean awsUseRole) throws IOException {
             boolean valid = false;
             try {
-                SqsProfile profile = new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue);
+
+                SqsProfile profile = new SqsProfile(awsAccessKeyId,awsSecretAccessKey,sqsQueue,awsUseRole);
+
                 String queue = profile.getQueueUrl();
-                if(queue != null) {
+                if (queue != null) {
                     return FormValidation.ok("Verified SQS Queue " + queue);
                 } else {
                     return FormValidation.error("Failed to validate the account");
