@@ -1,8 +1,10 @@
 package com.base2services.jenkins;
 
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
@@ -13,7 +15,6 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -29,7 +30,6 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     private final boolean awsUseRole;
 
     static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
-    static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
     private final boolean urlSpecified;
     private AmazonSQS client;
 
@@ -68,16 +68,12 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public AmazonSQS getSQSClient() {
         if (client == null) {
             if (!this.awsUseRole) {
-                client = new AmazonSQSClient(this);
+                BasicAWSCredentials credentials = new BasicAWSCredentials(getAWSAccessKeyId(),getAWSSecretKey());
+                client = AmazonSQSClientBuilder.standard()
+                        .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                        .build();
             } else {
-                client = new AmazonSQSClient();
-            }
-            if (urlSpecified) {
-                Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
-                if (endpointMatcher.find()) {
-                    String endpoint = endpointMatcher.group(1);
-                    client.setEndpoint(endpoint);
-                }
+                client = AmazonSQSClientBuilder.defaultClient();
             }
         }
         return client;
