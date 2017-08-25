@@ -1,8 +1,11 @@
 package com.base2services.jenkins;
 
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.client.builder.AwsClientBuilder;
 import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
@@ -68,10 +71,19 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
     public AmazonSQS getSQSClient() {
         if (client == null) {
             if (!this.awsUseRole) {
-                client = new AmazonSQSClient(this);
+                BasicAWSCredentials credentials = new BasicAWSCredentials(getAWSAccessKeyId(),getAWSSecretKey());
+                client = AmazonSQSClientBuilder.standard()
+                        .withCredentials(new AWSStaticCredentialsProvider(credentials))
+                        .setEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration("ladida"))
+                        .build();
             } else {
-                client = new AmazonSQSClient();
+                client = AmazonSQSClientBuilder.defaultClient();
             }
+            /* TODO: client.setEndPoint is deprecated. Not sure if the client builders are compatible with this method
+               https://aws.amazon.com/blogs/developer/client-constructors-now-deprecated/
+               https://aws.amazon.com/blogs/developer/fluent-client-builders/
+            *
+            * */
             if (urlSpecified) {
                 Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
                 if (endpointMatcher.find()) {
