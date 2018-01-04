@@ -1,8 +1,10 @@
 package com.base2services.jenkins;
 
 import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
+import com.amazonaws.services.sqs.AmazonSQSClientBuilder;
 import com.amazonaws.services.sqs.model.CreateQueueRequest;
 import hudson.Extension;
 import hudson.model.AbstractDescribableImpl;
@@ -21,17 +23,17 @@ import java.util.regex.Pattern;
  *
  * @author aaronwalker
  */
-public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements AWSCredentials {
+public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements AWSCredentials, AWSCredentialsProvider {
 
     public final String awsAccessKeyId;
     public final Secret awsSecretAccessKey;
     public final String sqsQueue;
     private final boolean awsUseRole;
 
-    static final String queueUrlRegex = "^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$";
-    static final Pattern endpointPattern = Pattern.compile("(sqs\\..+?\\.amazonaws\\.com)");
+    static final Pattern queueUrlRegex = Pattern.compile("^https://sqs\\.(.+?)\\.amazonaws\\.com/(.+?)/(.+)$");
     private final boolean urlSpecified;
-    private AmazonSQS client;
+    private transient AmazonSQS client;
+    private final transient String region;
 
 
     @DataBoundConstructor
@@ -45,16 +47,33 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
             this.awsSecretAccessKey = awsSecretAccessKey;
         }
         this.sqsQueue = sqsQueue;
-        this.urlSpecified = Pattern.matches(queueUrlRegex, sqsQueue);
+        Matcher urlMatcher = queueUrlRegex.matcher(sqsQueue);
+        this.urlSpecified = urlMatcher.matches();
+        if (urlSpecified) {
+            this.region = urlMatcher.group(1);
+        } else {
+            this.region = "";
+        }
         this.client = null;
     }
 
+    @Override
     public String getAWSAccessKeyId() {
         return awsAccessKeyId;
     }
 
+    @Override
     public String getAWSSecretKey() {
         return awsSecretAccessKey.getPlainText();
+    }
+
+    @Override
+    public AWSCredentials getCredentials() {
+        return this;
+    }
+
+    @Override
+    public void refresh() {
     }
 
     public final boolean getAWSUseRole() {
@@ -67,18 +86,14 @@ public class SqsProfile extends AbstractDescribableImpl<SqsProfile> implements A
 
     public AmazonSQS getSQSClient() {
         if (client == null) {
+            AmazonSQSClientBuilder builder = AmazonSQSClient.builder();
             if (!this.awsUseRole) {
-                client = new AmazonSQSClient(this);
-            } else {
-                client = new AmazonSQSClient();
+                builder = builder.withCredentials(this);
             }
-            if (urlSpecified) {
-                Matcher endpointMatcher = endpointPattern.matcher(getSqsQueue());
-                if (endpointMatcher.find()) {
-                    String endpoint = endpointMatcher.group(1);
-                    client.setEndpoint(endpoint);
-                }
+            if (this.urlSpecified) {
+                builder = builder.withRegion(region);
             }
+            client = builder.build();
         }
         return client;
     }
