@@ -87,8 +87,10 @@ public class SqsQueueHandler extends PeriodicWork {
                     String actualMessage = messageParser.extractActualGithubMessage(awsMessage);
                     LOGGER.fine("Actual Github Message: " + actualMessage);
 
-
-                    GHEvent event  = messageParser.getGithubEvent(awsMessage);
+                    GHEvent event = GHEvent.PUSH;
+                    if (awsMessage != actualMessage) {
+                        event = messageParser.getGithubEvent(awsMessage);
+                    }
                     LOGGER.fine("Github event type: " + event.toString());
 
                     switch (event) {
