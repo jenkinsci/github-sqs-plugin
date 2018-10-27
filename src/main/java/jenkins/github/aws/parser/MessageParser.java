@@ -7,9 +7,9 @@ public class MessageParser {
 
     /**
      * The message will be received via SQS, but if Github was configured to submit it to SNS some extra json payload will be added.
-     * This method extract the actual Github message.
+     * This method extracts the actual Github message.
      *
-     * @param originalAwsMessage
+     * @param originalAwsMessage the original AWS message to parse
      * @return the message as sent from Github
      */
     public String extractActualGithubMessage(String originalAwsMessage) {
@@ -23,9 +23,10 @@ public class MessageParser {
 
 
     /**
-     * Parse the original sns message for the github event type.
-     * @param originalAwsMessage
-     * @return
+     * Parses the original SNS message for the Github event type.
+     *
+     * @param originalAwsMessage the original AWS message to parse
+     * @return the Github event type
      */
     public GHEvent getGithubEvent(String originalAwsMessage) {
         JSONObject json = JSONObject.fromObject(originalAwsMessage);
