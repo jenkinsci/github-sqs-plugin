@@ -15,8 +15,7 @@ public class MessageParser {
     public String extractActualGithubMessage(String originalAwsMessage) {
         JSONObject json = JSONObject.fromObject(originalAwsMessage);
         if (json.has("Type")) {
-            String msg = json.getString("Message");
-            return msg;
+            return json.getString("Message");
         } else {
             return originalAwsMessage;
         }
