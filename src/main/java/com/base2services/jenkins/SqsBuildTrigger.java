@@ -33,7 +33,7 @@ public class SqsBuildTrigger extends Trigger<Job> {
     @Extension
     public static class DescriptorImpl extends TriggerDescriptor {
 
-        private volatile List<SqsProfile> sqsProfiles = new ArrayList<SqsProfile>();
+        private volatile List<SqsProfile> sqsProfiles = new ArrayList<>();
 
         public DescriptorImpl() {
             load();
