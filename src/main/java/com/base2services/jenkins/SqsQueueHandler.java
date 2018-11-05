@@ -8,13 +8,13 @@ import com.cloudbees.jenkins.GitHubWebHook;
 import hudson.Extension;
 import hudson.model.PeriodicWork;
 import hudson.util.SequentialExecutionQueue;
-import hudson.util.TimeUnit2;
 import jenkins.github.aws.parser.MessageParser;
 import org.kohsuke.github.GHEvent;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -34,7 +34,7 @@ public class SqsQueueHandler extends PeriodicWork {
 
     @Override
     public long getRecurrencePeriod() {
-        return TimeUnit2.SECONDS.toMillis(5);
+        return TimeUnit.SECONDS.toMillis(5);
     }
 
     @Override

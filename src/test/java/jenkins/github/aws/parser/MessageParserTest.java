@@ -2,7 +2,6 @@ package jenkins.github.aws.parser;
 
 import org.apache.commons.io.IOUtils;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.kohsuke.github.GHEvent;
 
