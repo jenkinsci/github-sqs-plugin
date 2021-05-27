@@ -1,12 +1,28 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:local="local">
+    <d:taglib uri="local">
+        <d:tag name="blockWrapperTable">
+            <j:choose>
+                <j:when test="${divBasedFormLayout}">
+                    <div>
+                        <d:invokeBody/>
+                    </div>
+                </j:when>
+                <j:otherwise>
+                    <table style="width:100%">
+                        <d:invokeBody/>
+                    </table>
+                </j:otherwise>
+            </j:choose>
+        </d:tag>
+    </d:taglib>
     <f:section title="${%Amazon SQS Configuration}">
         <f:nested>
-            <table style="width:100%">
+            <local:blockWrapperTable>
                 <f:section title="${%Amazon SQS Profiles}">
                     <f:block>
                         <f:repeatable field="sqsProfiles" minimum="${1}" noAddButton="true">
-                            <table style="width:100%">
+                            <local:blockWrapperTable>
                                 <st:include from="${descriptor}" page="${descriptor.configPage}" />
                                 <f:entry>
                                     <div align="right">
@@ -14,11 +30,11 @@
                                         <f:repeatableDeleteButton />
                                     </div>
                                 </f:entry>
-                            </table>
+                            </local:blockWrapperTable>
                         </f:repeatable>
                     </f:block>
                 </f:section>
-            </table>
+            </local:blockWrapperTable>
         </f:nested>
     </f:section>
 </j:jelly>
